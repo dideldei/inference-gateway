@@ -5,9 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "inference-gateway"
 version = "0.2.0"
-description = "OpenAI-compatible inference library with audio preprocessing and intelligent routing"
+description = "Lightweight Python library for audio transcription and text generation using OpenAI-compatible APIs"
 readme = "README.md"
 requires-python = ">=3.11"
+license = {text = "MIT"}
 dependencies = [
     "httpx>=0.25.0",
     "pydantic>=2.0.0",

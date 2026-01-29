@@ -1,15 +1,17 @@
 # Inference Gateway — Python Library
 
-A lightweight Python library for interacting with OpenAI-compatible inference backends, with support for audio preprocessing, intelligent routing, and high-level operations like transcription and analysis.
+A lightweight Python library for audio transcription and text generation using OpenAI-compatible APIs.
+
+**Supports:** Voxtral (audio transcription + analysis) via llama.cpp
 
 ## Features
 
-- **🎯 Simple API** - Async functions for transcription, analysis, and chat completion
-- **🔊 Audio Preprocessing** - Automatic audio normalization with ffmpeg (optional)
-- **🔀 Intelligent Routing** - Route requests to different backends based on content
-- **🔌 OpenAI Compatible** - Works with any OpenAI-compatible inference backend
-- **📦 Minimal Dependencies** - Just httpx + pydantic
+- **🎙️ Audio Transcription** - Transcribe audio files to text
+- **📊 Audio Analysis** - Analyze audio with custom instructions (summarize, extract info, etc.)
+- **💬 Chat Completion** - Text generation with OpenAI-compatible API
 - **⚡ Async/Await** - Full async support for high performance
+- **📦 Minimal Dependencies** - Just httpx + pydantic
+- **🔄 Single Model** - One unified model handles transcription + analysis
 
 ## Installation
 
@@ -21,71 +23,77 @@ pip install inference-gateway
 
 ```python
 import asyncio
-from inference_gateway import GatewayConfig, transcribe_audio
+from inference_gateway import GatewayConfig, transcribe_audio, analyze_audio, chat_completion
 
+config = GatewayConfig(text_base_url="http://localhost:8080")
+
+# Transcribe audio
 async def main():
-    # Configure
-    config = GatewayConfig(
-        text_base_url="http://localhost:8080",
-        audio_preprocess_enabled=True,
-    )
-    
-    # Load audio
-    with open("recording.mp3", "rb") as f:
-        audio_bytes = f.read()
-    
-    # Transcribe
-    transcript = await transcribe_audio(audio_bytes, config)
-    print(f"Transcript: {transcript}")
+    with open("audio.wav", "rb") as f:
+        transcript = await transcribe_audio(f.read(), config)
+    print(transcript)
 
-# Run
 asyncio.run(main())
 ```
 
+## Server Setup
+
+### Quick Start (Recommended)
+
+**Windows (PowerShell):**
+```powershell
+.\scripts\start_server.ps1
+```
+
+**Linux / macOS:**
+```bash
+./scripts/start_server.sh
+```
+
+### Manual Start
+
+```bash
+./llama-server -hf bartowski/mistralai_Voxtral-Mini-3B-2507-GGUF:Q5_K_M --port 8080
+```
+
+### Verify Server
+
+```bash
+curl http://localhost:8080/health
+# Returns: {"status":"ok"}
+```
+
+See [scripts/README.md](scripts/README.md) for more options and troubleshooting.
+
 ## Documentation
 
-- **[LIBRARY_USAGE.md](LIBRARY_USAGE.md)** — Complete API reference with examples
-- **[examples/](examples/)** — Working code examples (transcribe, analyze, chat)
-- **[REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md)** — What changed in v0.2.0
+- **[USAGE.md](USAGE.md)** — Complete usage guide with examples
+- **[LIBRARY_USAGE.md](LIBRARY_USAGE.md)** — API reference
+- **[examples/](examples/)** — Code examples
 
-## For v0.1.0 Users
+## API Overview
 
-If you're using the **server mode** from v0.1.0, you have options:
+```python
+# Transcribe
+transcript = await transcribe_audio(audio_bytes, config)
 
-1. **Continue with v0.1.0** - Pin your dependency:
-   ```bash
-   pip install 'inference-gateway==0.1.0'
-   ```
+# Analyze audio
+result = await analyze_audio(audio_bytes, "Summarize this", config)
 
-2. **Use the library** - Integrate into your Python application (recommended):
-   ```python
-   from inference_gateway import GatewayConfig, transcribe_audio
-   ```
-
-3. **Build your own server** - Use the library in a FastAPI wrapper:
-   ```python
-   from fastapi import FastAPI, UploadFile
-   from inference_gateway import GatewayConfig, transcribe_audio
-   
-   app = FastAPI()
-   config = GatewayConfig(text_base_url="http://localhost:8080")
-   
-   @app.post("/transcribe")
-   async def transcribe(file: UploadFile):
-       audio = await file.read()
-       transcript = await transcribe_audio(audio, config)
-       return {"transcript": transcript}
-   ```
-
-See [app/](app/) for the original v0.1.0 server code.
+# Chat/Text generation
+response = await chat_completion(
+    messages=[{"role": "user", "content": "Hello"}],
+    config=config,
+)
+text = response["choices"][0]["message"]["content"]
+```
 
 ## Requirements
 
-- Python 3.11 or higher
-- httpx (installed automatically)
-- pydantic (installed automatically)
-- Optional: ffmpeg (for audio preprocessing)
+- Python 3.11+
+- llama.cpp server with Voxtral model
+- httpx, pydantic (auto-installed)
 
 ## License
 
-[Add license here]
+MIT License - see [LICENSE](LICENSE) for details

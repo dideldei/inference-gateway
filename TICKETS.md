@@ -3,9 +3,8 @@
 This document describes implementation tickets for the original server mode (v0.1.0).
 
 **For the current library mode (v0.2.0):**
-- See [LIBRARY_USAGE.md](LIBRARY_USAGE.md) for complete API documentation
+- See [USAGE.md](USAGE.md) for complete API documentation
 - See [examples/](examples/) for working code examples
-- See [REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md) for transition details
 
 **This is kept for historical reference.**
 
