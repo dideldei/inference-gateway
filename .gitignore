@@ -42,3 +42,7 @@ build/
 # Temporary files
 *.tmp
 *.temp
+
+# Internal documentation (for development only)
+AGENTS.md
+TICKETS.md
