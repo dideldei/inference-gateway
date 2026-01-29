@@ -15,8 +15,12 @@ A lightweight async Python library for audio transcription and text generation u
 
 ## Installation
 
+Clone and install from source:
+
 ```bash
-pip install inference-gateway
+git clone https://github.com/dideldei/inference-gateway.git
+cd inference-gateway
+pip install -e .
 ```
 
 ## Quick Example

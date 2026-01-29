@@ -18,15 +18,17 @@ A lightweight Python library for audio transcription and text generation using O
 
 ## Installation
 
-```bash
-pip install inference-gateway
-```
+Clone and install from source:
 
-For development:
 ```bash
-git clone <repository>
+git clone https://github.com/dideldei/inference-gateway.git
 cd inference-gateway
 pip install -e .
+```
+
+Or from a local directory:
+```bash
+pip install -e /path/to/inference-gateway
 ```
 
 ## Quick Start

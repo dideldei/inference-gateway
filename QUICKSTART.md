@@ -4,8 +4,18 @@ Get the inference gateway library running in just a few steps.
 
 ## 1. Install (1 minute)
 
+Clone and install from source:
+
 ```bash
-pip install inference-gateway
+git clone https://github.com/dideldei/inference-gateway.git
+cd inference-gateway
+pip install -e .
+```
+
+Or if you have it in a local directory:
+
+```bash
+pip install -e /path/to/inference-gateway
 ```
 
 ## 2. Start the Server (1 minute)
