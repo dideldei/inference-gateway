@@ -45,4 +45,3 @@ def setup_logging(level: str = "INFO") -> None:
     # Quiet down noisy libraries
     logging.getLogger("httpx").setLevel(max(numeric_level, logging.WARNING))
     logging.getLogger("httpcore").setLevel(max(numeric_level, logging.WARNING))
-    logging.getLogger("uvicorn.access").setLevel(max(numeric_level, logging.WARNING))

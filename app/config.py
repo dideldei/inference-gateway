@@ -88,6 +88,10 @@ class Settings(BaseSettings):
         default="loudnorm=I=-16:TP=-1.5:LRA=11",
         description="Loudness normalization filter parameters (EBU R128)",
     )
+    audio_max_upload_bytes: int = Field(
+        default=20_000_000,
+        description="Maximum allowed audio upload size in bytes (default 20 MB)",
+    )
 
     # Convenience Endpoint Prompts
     transcribe_system_prompt: str = Field(

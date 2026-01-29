@@ -48,14 +48,14 @@ async def test_forward_chat_completion_success(mock_settings):
         200,
         json={"choices": [{"message": {"role": "assistant", "content": "Hello"}}]},
     )
-    
+
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_response):
         response = await forward_chat_completion(
             {"model": "test", "messages": [{"role": "user", "content": "Hi"}]},
             "http://127.0.0.1:11434",
             mock_settings,
         )
-        
+
         assert response.status_code == 200
         assert response.json() == {"choices": [{"message": {"role": "assistant", "content": "Hello"}}]}
 
@@ -70,7 +70,7 @@ async def test_forward_chat_completion_connection_error(mock_settings):
                 "http://127.0.0.1:11434",
                 mock_settings,
             )
-        
+
         assert "Connection to upstream failed" in str(exc_info.value.message)
         assert exc_info.value.upstream == "http://127.0.0.1:11434"
 
@@ -85,7 +85,7 @@ async def test_forward_chat_completion_timeout(mock_settings):
                 "http://127.0.0.1:11434",
                 mock_settings,
             )
-        
+
         assert "did not respond in time" in str(exc_info.value.message)
         assert exc_info.value.upstream == "http://127.0.0.1:11434"
 
@@ -97,10 +97,10 @@ async def test_forward_models_success(mock_settings):
         200,
         json={"data": [{"id": "model1"}, {"id": "model2"}]},
     )
-    
+
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock, return_value=mock_response):
         response = await forward_models("http://127.0.0.1:11434", mock_settings)
-        
+
         assert response.status_code == 200
         assert response.json() == {"data": [{"id": "model1"}, {"id": "model2"}]}
 
@@ -194,16 +194,13 @@ def test_select_upstream_url_audio_text_mode_audio(mock_settings_audio_text):
 
 def test_select_upstream_url_missing_url():
     """Test that missing upstream URL raises ValueError."""
-    settings = Settings(
-        text_base_url=None,
-        audio_base_url=None,
-        default_base_url=None,
-        routing_mode="single",
-        upstream_timeout_s=300.0,
-        upstream_connect_timeout_s=10.0,
-    )
+    from unittest.mock import MagicMock
+
+    settings = MagicMock()
+    settings.routing_mode = "single"
+    settings.effective_base_url = ""
     request_body = {"model": "test", "messages": [{"role": "user", "content": "Hi"}]}
-    
+
     with pytest.raises(ValueError, match="No upstream URL configured"):
         select_upstream_url(request_body, settings)
 
@@ -218,12 +215,12 @@ def test_chat_completions_endpoint_success(mock_forward, mock_get_settings, mock
         json={"choices": [{"message": {"role": "assistant", "content": "Hello"}}]},
     )
     mock_forward.return_value = mock_response
-    
+
     response = client.post(
         "/v1/chat/completions",
         json={"model": "test", "messages": [{"role": "user", "content": "Hi"}]},
     )
-    
+
     assert response.status_code == 200
     assert response.json() == {"choices": [{"message": {"role": "assistant", "content": "Hello"}}]}
 
@@ -234,16 +231,16 @@ def test_chat_completions_endpoint_502(mock_forward, mock_get_settings, mock_set
     """Test chat completions endpoint returns 502 on upstream unreachable."""
     mock_get_settings.return_value = mock_settings
     mock_forward.side_effect = UpstreamUnreachableError("Connection failed", "http://127.0.0.1:11434")
-    
+
     response = client.post(
         "/v1/chat/completions",
         json={"model": "test", "messages": [{"role": "user", "content": "Hi"}]},
     )
-    
+
     assert response.status_code == 502
     data = response.json()
-    assert data["error"]["type"] == "upstream_unreachable"
-    assert data["upstream"] == "http://127.0.0.1:11434"
+    assert data["detail"]["error"]["type"] == "upstream_unreachable"
+    assert data["detail"]["upstream"] == "http://127.0.0.1:11434"
 
 
 @patch("app.main.get_settings")
@@ -252,29 +249,29 @@ def test_chat_completions_endpoint_504(mock_forward, mock_get_settings, mock_set
     """Test chat completions endpoint returns 504 on upstream timeout."""
     mock_get_settings.return_value = mock_settings
     mock_forward.side_effect = UpstreamTimeoutError("Timeout", "http://127.0.0.1:11434")
-    
+
     response = client.post(
         "/v1/chat/completions",
         json={"model": "test", "messages": [{"role": "user", "content": "Hi"}]},
     )
-    
+
     assert response.status_code == 504
     data = response.json()
-    assert data["error"]["type"] == "upstream_timeout"
-    assert data["upstream"] == "http://127.0.0.1:11434"
+    assert data["detail"]["error"]["type"] == "upstream_timeout"
+    assert data["detail"]["upstream"] == "http://127.0.0.1:11434"
 
 
 @patch("app.main.get_settings")
 def test_chat_completions_endpoint_invalid_json(mock_get_settings, mock_settings):
     """Test chat completions endpoint returns 400 on invalid JSON."""
     mock_get_settings.return_value = mock_settings
-    
+
     response = client.post(
         "/v1/chat/completions",
         content="not json",
         headers={"Content-Type": "application/json"},
     )
-    
+
     assert response.status_code == 400
     data = response.json()
     assert data["detail"]["error"]["type"] == "invalid_json"
@@ -284,12 +281,12 @@ def test_chat_completions_endpoint_invalid_json(mock_get_settings, mock_settings
 def test_chat_completions_endpoint_not_dict(mock_get_settings, mock_settings):
     """Test chat completions endpoint returns 400 when body is not a dict."""
     mock_get_settings.return_value = mock_settings
-    
+
     response = client.post(
         "/v1/chat/completions",
         json=["not", "a", "dict"],
     )
-    
+
     assert response.status_code == 400
     data = response.json()
     assert data["detail"]["error"]["type"] == "invalid_request"
@@ -305,9 +302,9 @@ def test_models_endpoint_success(mock_forward, mock_get_settings, mock_settings)
         json={"data": [{"id": "model1"}, {"id": "model2"}]},
     )
     mock_forward.return_value = mock_response
-    
+
     response = client.get("/v1/models")
-    
+
     assert response.status_code == 200
     assert response.json() == {"data": [{"id": "model1"}, {"id": "model2"}]}
 
@@ -318,12 +315,12 @@ def test_models_endpoint_502(mock_forward, mock_get_settings, mock_settings):
     """Test models endpoint returns 502 on upstream unreachable."""
     mock_get_settings.return_value = mock_settings
     mock_forward.side_effect = UpstreamUnreachableError("Connection failed", "http://127.0.0.1:11434")
-    
+
     response = client.get("/v1/models")
-    
+
     assert response.status_code == 502
     data = response.json()
-    assert data["error"]["type"] == "upstream_unreachable"
+    assert data["detail"]["error"]["type"] == "upstream_unreachable"
 
 
 @patch("app.main.get_settings")
@@ -332,25 +329,25 @@ def test_models_endpoint_504(mock_forward, mock_get_settings, mock_settings):
     """Test models endpoint returns 504 on upstream timeout."""
     mock_get_settings.return_value = mock_settings
     mock_forward.side_effect = UpstreamTimeoutError("Timeout", "http://127.0.0.1:11434")
-    
+
     response = client.get("/v1/models")
-    
+
     assert response.status_code == 504
     data = response.json()
-    assert data["error"]["type"] == "upstream_timeout"
+    assert data["detail"]["error"]["type"] == "upstream_timeout"
 
 
 @patch("app.main.get_settings")
 def test_models_endpoint_audio_text_mode(mock_get_settings, mock_settings_audio_text):
     """Test models endpoint uses TEXT upstream in audio_text mode."""
     mock_get_settings.return_value = mock_settings_audio_text
-    
+
     with patch("app.main.forward_models") as mock_forward:
         mock_response = httpx.Response(200, json={"data": []})
         mock_forward.return_value = mock_response
-        
+
         client.get("/v1/models")
-        
+
         # Should call forward_models with TEXT_BASE_URL
         mock_forward.assert_called_once()
         call_args = mock_forward.call_args
@@ -368,12 +365,12 @@ def test_chat_completions_non_json_response(mock_forward, mock_get_settings, moc
         headers={"content-type": "text/plain"},
     )
     mock_forward.return_value = mock_response
-    
+
     response = client.post(
         "/v1/chat/completions",
         json={"model": "test", "messages": [{"role": "user", "content": "Hi"}]},
     )
-    
+
     assert response.status_code == 200
     # Response should be passed through as-is (though FastAPI TestClient may parse it)
     assert response.headers["content-type"] == "text/plain"

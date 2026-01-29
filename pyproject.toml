@@ -4,17 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "inference-gateway"
-version = "0.1.0"
-description = "OpenAI-compatible inference gateway with optional audio preprocessing and routing"
+version = "0.2.0"
+description = "OpenAI-compatible inference library with audio preprocessing and intelligent routing"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi>=0.104.0",
-    "uvicorn[standard]>=0.24.0",
     "httpx>=0.25.0",
     "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
-    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -24,7 +20,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["app"]
+packages = ["inference_gateway"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
