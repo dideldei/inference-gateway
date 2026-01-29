@@ -1,20 +1,21 @@
-# Inference Gateway - Core Library
+# Inference Gateway Library
 
-This is the core library module. Copy this entire `inference_gateway/` folder to use the library in other projects.
+Core library code for OpenAI-compatible audio transcription and text generation.
 
-## What's Inside
+## Module Structure
 
 ```
 inference_gateway/
-├── __init__.py              # Public API exports
-└── core/                    # Core library (no FastAPI dependencies)
-    ├── __init__.py
-    ├── audio.py            # Audio preprocessing and normalization
-    ├── client.py           # HTTP forwarding to upstream backends
-    ├── config.py           # GatewayConfig dataclass
-    ├── exceptions.py       # Custom exception types
-    ├── operations.py       # High-level API (transcribe, analyze, chat)
-    └── routing.py          # Backend routing logic
+├── __init__.py                 # Public API
+├── core/
+│   ├── audio.py               # Audio preprocessing
+│   ├── client.py              # HTTP forwarding
+│   ├── config.py              # Configuration
+│   ├── exceptions.py          # Custom exceptions
+│   ├── operations.py          # High-level API
+│   └── routing.py             # Backend routing logic
+└── utils/
+    └── logging.py             # Logging utilities
 ```
 
 ## Public API
@@ -31,83 +32,23 @@ from inference_gateway import (
 )
 ```
 
-## Module Overview
+## Core Modules
 
-### config.py
-Defines `GatewayConfig` dataclass for configuration.
+- **config.py** - Configuration management (GatewayConfig)
+- **operations.py** - High-level async operations (transcribe, analyze, chat)
+- **client.py** - Low-level HTTP forwarding to upstream
+- **audio.py** - Audio format conversion and preprocessing
+- **routing.py** - Logic for selecting upstream server (single vs audio_text mode)
+- **exceptions.py** - Custom exception types
 
-```python
-config = GatewayConfig(
-    text_base_url="http://localhost:8080",
-    routing_mode="single",
-    timeout_s=300.0,
-    connect_timeout_s=10.0,
-)
-```
+## Documentation
 
-### operations.py
-High-level async API functions:
-- `transcribe_audio()` - Audio to text
-- `analyze_audio()` - Analyze audio with instruction
-- `chat_completion()` - OpenAI-compatible chat
-- `list_models()` - List available models
+Full documentation is in the repository root:
 
-### client.py
-Low-level HTTP forwarding:
-- `forward_chat_completion()` - Forward request to upstream
-- `forward_models()` - Forward models list request
-
-### audio.py
-Audio processing utilities:
-- `normalize_audio_to_wav()` - Normalize audio format/sample rate
-
-### routing.py
-Backend routing logic:
-- `select_upstream_url()` - Select which backend to use
-
-### exceptions.py
-Custom exceptions:
-- `UpstreamUnreachableError`
-- `UpstreamTimeoutError`
-- `InvalidRequestError`
-- `ConfigurationError`
-
-## Usage
-
-### Basic Example
-
-```python
-import asyncio
-from inference_gateway import GatewayConfig, transcribe_audio
-
-async def main():
-    config = GatewayConfig(text_base_url="http://localhost:8080")
-    
-    with open("audio.wav", "rb") as f:
-        transcript = await transcribe_audio(f.read(), config)
-    
-    print(transcript)
-
-asyncio.run(main())
-```
-
-### With Error Handling
-
-```python
-from inference_gateway import GatewayConfig, transcribe_audio
-from inference_gateway.core.exceptions import UpstreamUnreachableError, UpstreamTimeoutError
-
-async def safe_transcribe(audio_file, config):
-    try:
-        with open(audio_file, "rb") as f:
-            return await transcribe_audio(f.read(), config)
-    except UpstreamUnreachableError:
-        print("Server not running")
-        return None
-    except UpstreamTimeoutError:
-        print("Server timeout")
-        return None
-```
+- [QUICKSTART.md](../QUICKSTART.md) - Get started in 5 minutes
+- [USAGE_GUIDE.md](../USAGE_GUIDE.md) - Complete API reference
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Design and internals
+- [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) - Common issues
 
 ## Dependencies
 
@@ -115,33 +56,14 @@ async def safe_transcribe(audio_file, config):
 - `pydantic>=2.0.0` - Data validation
 
 Optional:
-- `ffmpeg` - For audio preprocessing (if `audio_preprocess_enabled=True`)
-
-## To Use in Your Project
-
-1. **Copy this folder** to your project
-2. **Install dependencies:**
-   ```bash
-   pip install httpx pydantic
-   ```
-3. **Import and use:**
-   ```python
-   from inference_gateway import GatewayConfig, transcribe_audio
-   ```
-
-## Architecture Notes
-
-- **No external dependencies** on FastAPI, uvicorn, or other frameworks
-- **Pure async/await** throughout
-- **OpenAI-compatible** request/response format
-- **Minimal and focused** - only handles audio transcription and text generation
-- **Backend agnostic** - works with any OpenAI-compatible API server
+- `ffmpeg` - For audio preprocessing (if enabled)
 
 ## Testing
 
-The library is tested with:
-- llama.cpp server (with Voxtral model + mmproj)
-- Audio files in WAV format
-- Async operation in various contexts (FastAPI, plain asyncio, etc.)
+Run tests with pytest:
 
-See parent project for test files and examples.
+```bash
+pytest tests/
+```
+
+Integration tests in `tests/integration_test_*.py` require a running inference server.

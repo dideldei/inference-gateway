@@ -1,0 +1,1 @@
+C:\Users\slodd\llama audio gateway\inference_gateway\ARCHITECTURE.md

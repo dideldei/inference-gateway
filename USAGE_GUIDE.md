@@ -1,6 +1,20 @@
-# Inference Gateway - Library Usage Guide
+# Inference Gateway - Complete Usage Guide
 
-This guide shows how to use `inference-gateway` as a Python library in your applications.
+A lightweight Python library for audio transcription and text generation using OpenAI-compatible APIs.
+
+## Table of Contents
+
+1. [Installation](#installation)
+2. [Quick Start](#quick-start)
+3. [Configuration](#configuration)
+4. [API Reference](#api-reference)
+5. [Common Patterns](#common-patterns)
+6. [Audio Preprocessing](#audio-preprocessing)
+7. [Error Handling](#error-handling)
+8. [Advanced Usage](#advanced-usage)
+9. [Server Setup](#server-setup)
+10. [Logging](#logging)
+11. [Examples](#examples)
 
 ## Installation
 
@@ -11,13 +25,21 @@ pip install inference-gateway
 For development:
 ```bash
 git clone <repository>
-cd llama-audio-gateway
+cd inference-gateway
 pip install -e .
 ```
 
 ## Quick Start
 
-### Basic Chat Completion
+### 1. Start the Server
+
+```bash
+./llama-server -hf bartowski/mistralai_Voxtral-Mini-3B-2507-GGUF:Q5_K_M --port 8080
+```
+
+**Important:** The `-hf` flag automatically downloads and loads the mmproj (audio encoder) which is **required** for audio transcription and analysis.
+
+### 2. Basic Chat Completion
 
 ```python
 import asyncio
@@ -36,7 +58,7 @@ async def main():
 asyncio.run(main())
 ```
 
-### Audio Transcription
+### 3. Audio Transcription
 
 ```python
 import asyncio
@@ -45,29 +67,24 @@ from inference_gateway import GatewayConfig, transcribe_audio
 async def main():
     config = GatewayConfig(
         text_base_url="http://localhost:8080",
-        audio_preprocess_enabled=True,
+        audio_preprocess_enabled=True,  # Enable audio preprocessing
     )
     
-    with open("audio.mp3", "rb") as f:
-        audio_bytes = f.read()
-    
-    transcript = await transcribe_audio(audio_bytes, config)
+    with open("audio.wav", "rb") as f:
+        transcript = await transcribe_audio(f.read(), config)
     print(f"Transcript: {transcript}")
 
 asyncio.run(main())
 ```
 
-### Audio Analysis
+### 4. Audio Analysis
 
 ```python
 import asyncio
 from inference_gateway import GatewayConfig, analyze_audio
 
 async def main():
-    config = GatewayConfig(
-        audio_base_url="http://localhost:8080",
-        audio_preprocess_enabled=True,
-    )
+    config = GatewayConfig(text_base_url="http://localhost:8080")
     
     with open("meeting.wav", "rb") as f:
         audio_bytes = f.read()
@@ -93,11 +110,13 @@ config = GatewayConfig(
     # Required
     text_base_url="http://localhost:8080",
     
-    # Optional
+    # Optional: Routing & Upstreams
     audio_base_url="http://localhost:8081",  # For dual-mode routing
     routing_mode="single",  # or "audio_text"
-    timeout_s=300.0,  # Total timeout
-    connect_timeout_s=10.0,  # Connection timeout
+    
+    # Timeouts
+    timeout_s=300.0,  # Total timeout (seconds)
+    connect_timeout_s=10.0,  # Connection timeout (seconds)
     
     # Audio preprocessing
     audio_preprocess_enabled=False,  # Set True to enable ffmpeg
@@ -125,6 +144,8 @@ config = GatewayConfig(
 - Audio requests → `audio_base_url`
 - Automatically detects audio content in messages
 - Use when you have separate backends for text and audio
+
+---
 
 ## API Reference
 
@@ -169,6 +190,10 @@ Analyze audio with a custom instruction.
 **Returns:**
 - `str`: Analysis result text
 
+**Raises:**
+- `AudioProcessingError`: If audio preprocessing fails
+- `UpstreamError`: If upstream request fails
+
 **Example:**
 ```python
 summary = await analyze_audio(
@@ -180,12 +205,12 @@ summary = await analyze_audio(
 
 #### `chat_completion(messages, config, **openai_params)`
 
-Send a chat completion request.
+Send a chat completion request (OpenAI-compatible).
 
 **Parameters:**
 - `messages` (list[dict]): OpenAI-format message list
 - `config` (GatewayConfig): Configuration object
-- `**openai_params`: Additional OpenAI parameters (temperature, max_tokens, etc.)
+- `**openai_params`: Additional OpenAI parameters (temperature, max_tokens, model, etc.)
 
 **Returns:**
 - `dict`: Full OpenAI-format response
@@ -200,7 +225,6 @@ response = await chat_completion(
     config=config,
     temperature=0.7,
     max_tokens=100,
-    model="gpt-4",
 )
 
 # Access response
@@ -225,9 +249,79 @@ for model in models["data"]:
     print(f"Model: {model['id']}")
 ```
 
+---
+
+## Common Patterns
+
+### Batch Processing (Concurrent)
+
+Process multiple audio files in parallel:
+
+```python
+import asyncio
+from pathlib import Path
+
+async def transcribe_batch(audio_dir: str, config: GatewayConfig):
+    """Transcribe all audio files in a directory."""
+    audio_files = Path(audio_dir).glob("*.mp3")
+    
+    tasks = []
+    for audio_path in audio_files:
+        audio_bytes = audio_path.read_bytes()
+        task = transcribe_audio(audio_bytes, config)
+        tasks.append((audio_path.name, task))
+    
+    results = await asyncio.gather(*[task for _, task in tasks])
+    return dict(zip([name for name, _ in tasks], results))
+
+# Usage
+transcripts = await transcribe_batch("recordings/", config)
+for filename, transcript in transcripts.items():
+    print(f"{filename}: {transcript[:100]}...")
+```
+
+### Error Handling
+
+```python
+async def safe_transcribe(audio_file: str, config: GatewayConfig) -> str | None:
+    try:
+        with open(audio_file, "rb") as f:
+            return await transcribe_audio(f.read(), config)
+    except FileNotFoundError:
+        print(f"File not found: {audio_file}")
+        return None
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+```
+
+### FastAPI Integration
+
+```python
+from fastapi import FastAPI, UploadFile
+from inference_gateway import GatewayConfig, transcribe_audio
+
+app = FastAPI()
+config = GatewayConfig(text_base_url="http://localhost:8080")
+
+@app.post("/transcribe")
+async def api_transcribe(file: UploadFile):
+    content = await file.read()
+    transcript = await transcribe_audio(content, config)
+    return {"transcript": transcript}
+
+@app.post("/analyze")
+async def api_analyze(file: UploadFile, instruction: str):
+    content = await file.read()
+    result = await analyze_audio(content, instruction, config)
+    return {"result": result}
+```
+
+---
+
 ## Audio Preprocessing
 
-The library supports automatic audio preprocessing using ffmpeg:
+The library supports automatic audio preprocessing using ffmpeg.
 
 ### When to Enable
 
@@ -252,10 +346,20 @@ config = GatewayConfig(
 
 ### Requirements
 
-- `ffmpeg` must be installed and accessible
-- Linux: `sudo apt install ffmpeg`
-- macOS: `brew install ffmpeg`
-- Windows: Download from https://ffmpeg.org/
+`ffmpeg` must be installed and accessible:
+
+**Linux:**
+```bash
+sudo apt install ffmpeg
+```
+
+**macOS:**
+```bash
+brew install ffmpeg
+```
+
+**Windows:**
+Download from https://ffmpeg.org/
 
 ### Without Preprocessing
 
@@ -263,6 +367,8 @@ If preprocessing is disabled:
 - Audio is passed as-is to the upstream
 - Upstream must handle format detection
 - Faster, no ffmpeg required
+
+---
 
 ## Error Handling
 
@@ -292,9 +398,13 @@ except InvalidRequestError as e:
     print(f"Invalid response: {e.message}")
 ```
 
+---
+
 ## Advanced Usage
 
 ### Custom Timeout Configuration
+
+For long-running inference operations:
 
 ```python
 config = GatewayConfig(
@@ -306,7 +416,7 @@ config = GatewayConfig(
 
 ### Working with Audio Content in Messages
 
-You can send audio content directly in chat messages:
+Send audio content directly in chat messages:
 
 ```python
 import base64
@@ -333,33 +443,59 @@ messages = [
 response = await chat_completion(messages, config)
 ```
 
-### Batch Processing
+### Custom System Prompts
 
-Process multiple audio files:
+Override default prompts for specific operations:
 
 ```python
-import asyncio
-from pathlib import Path
+# Transcription with custom prompt
+transcript = await transcribe_audio(
+    audio_bytes,
+    config,
+    system_prompt="Transcribe this German conversation verbatim",
+)
 
-async def transcribe_batch(audio_dir: str, config: GatewayConfig):
-    """Transcribe all audio files in a directory."""
-    audio_files = Path(audio_dir).glob("*.mp3")
-    
-    tasks = []
-    for audio_path in audio_files:
-        audio_bytes = audio_path.read_bytes()
-        task = transcribe_audio(audio_bytes, config)
-        tasks.append((audio_path.name, task))
-    
-    results = await asyncio.gather(*[task for _, task in tasks])
-    
-    return dict(zip([name for name, _ in tasks], results))
-
-# Usage
-transcripts = await transcribe_batch("recordings/", config)
-for filename, transcript in transcripts.items():
-    print(f"{filename}: {transcript[:100]}...")
+# Analysis with custom prefix
+analysis = await analyze_audio(
+    audio_bytes,
+    instruction="Identify speakers and topics",
+    config=config,
+    system_prompt_prefix="You are a meeting analyst.",
+)
 ```
+
+---
+
+## Server Setup
+
+### Quick Start with Scripts
+
+**Windows (PowerShell):**
+```powershell
+.\scripts\start_server.ps1
+```
+
+**Linux / macOS:**
+```bash
+./scripts/start_server.sh
+```
+
+See [scripts/README.md](scripts/README.md) for detailed options and troubleshooting.
+
+### Manual Start
+
+```bash
+./llama-server -hf bartowski/mistralai_Voxtral-Mini-3B-2507-GGUF:Q5_K_M --port 8080
+```
+
+### Verify Server
+
+```bash
+curl http://localhost:8080/health
+# Returns: {"status":"ok"}
+```
+
+---
 
 ## Logging
 
@@ -378,14 +514,65 @@ logger = logging.getLogger("inference_gateway")
 logger.setLevel(logging.DEBUG)
 ```
 
+---
+
 ## Examples
 
 See the `examples/` directory for complete, runnable examples:
-- `transcribe_example.py` - Audio transcription
+
 - `chat_example.py` - Chat completions
+- `transcribe_example.py` - Audio transcription
 - `analyze_example.py` - Audio analysis
 
-## Migration from Server Mode
+### Running Examples
+
+```bash
+python examples/chat_example.py
+python examples/transcribe_example.py
+python examples/analyze_example.py
+```
+
+---
+
+## Project Structure
+
+```
+inference_gateway/
+├── __init__.py                 # Public API
+├── core/
+│   ├── audio.py               # Audio preprocessing
+│   ├── client.py              # HTTP forwarding
+│   ├── config.py              # Configuration
+│   ├── exceptions.py          # Custom exceptions
+│   ├── operations.py          # High-level API
+│   └── routing.py             # Backend routing
+└── utils/
+    └── logging.py             # Logging setup
+```
+
+---
+
+## Performance
+
+- **Transcription:** ~5-10 seconds per minute of audio
+- **Analysis:** ~3-5 seconds
+- **Batch processing:** Use `asyncio.gather()` for parallel processing
+- **Concurrent requests:** Server supports multiple parallel requests
+
+---
+
+## Dependencies
+
+**Required:**
+- `httpx>=0.25.0` - Async HTTP client
+- `pydantic>=2.0.0` - Data validation
+
+**Optional:**
+- `ffmpeg` - For audio preprocessing (if enabled)
+
+---
+
+## Migration from Server Mode (v0.1.0)
 
 If you were using v0.1.0 as a server, you have options:
 
@@ -415,8 +602,8 @@ async def transcribe(file: UploadFile = File(...)):
     return {"transcript": transcript}
 ```
 
-## Support
+---
 
-- GitHub Issues: <repository-url>/issues
-- Documentation: README.md, API_EXAMPLES.md
-- Examples: `examples/` directory
+## License
+
+MIT License - see [LICENSE](LICENSE) for details
