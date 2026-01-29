@@ -1,0 +1,26 @@
+[Unit]
+Description=Inference Gateway - OpenAI-compatible proxy
+After=network.target
+
+[Service]
+Type=simple
+User=inference-gateway
+Group=inference-gateway
+WorkingDirectory=/opt/inference-gateway
+Environment="PATH=/opt/inference-gateway/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/opt/inference-gateway/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8090
+Restart=always
+RestartSec=10
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/inference-gateway
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
